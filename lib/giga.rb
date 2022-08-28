@@ -1,8 +1,15 @@
 require 'termios'
+require 'io/console'
+require 'stringio'
 
 module Giga
   class Editor
-    def initialize
+    def initialize(stdin = STDIN, stdout = STDOUT, stderr = STDERR)
+      @in, @out, @err = stdin, stdout, stderr
+      @height, @width = nil, nil
+      @current = nil
+      @text_content = nil
+      @cursor_position = nil
     end
 
     def refresh
@@ -37,7 +44,13 @@ module Giga
       append_buffer << "\x1b[?25h" # Show cursor
       stderr_log("'#{append_buffer}'".inspect)
       stderr_log("Cursor postition: x: #{@cursor_position[0]}, y: #{@cursor_position[1]}: #{y};#{x}H")
-      STDOUT.write(append_buffer)
+
+      # binding.break
+      if @out.is_a?(StringIO)
+        @out.rewind
+        @out.truncate(0)
+      end
+      @out.write(append_buffer)
     end
 
     def current_row
@@ -45,40 +58,55 @@ module Giga
     end
 
     def stderr_log(message)
-      unless STDERR.tty? # true when not redirecting to a file, a little janky but works for what I want
-        STDERR.puts(message)
+      # binding.break
+      unless @err.tty? # true when not redirecting to a file, a little janky but works for what I want
+        # binding.break
+        @err.puts(message)
       end
     end
 
+    def enable_raw_mode
+      IO.console.raw! if @out.tty?
+      # return unless @in.tty?
+
+      # # Raw mode
+      # @current = Termios.tcgetattr(@in)
+      # t = @current.dup
+      # t.c_iflag &= ~(Termios::BRKINT | Termios::ICRNL | Termios::INPCK | Termios::ISTRIP | Termios::IXON)
+      # t.c_oflag &= ~(Termios::OPOST)
+      # t.c_cflag |= (Termios::CS8)
+      # t.c_lflag &= ~(Termios::ECHO | Termios::ICANON | Termios::IEXTEN | Termios::ISIG)
+      # t.c_cc[Termios::VMIN] = 1 # Setting 0 as in Kilo raises EOF errors
+      # Termios.tcsetattr(@in, Termios::TCSANOW, t)
+    end
+
+    def extract_dimensions
+      if @out.tty?
+        @height, @width = IO.console.winsize
+      else
+        @height, @width = 10, 10
+      end
+      #   s = [0, 0, 0, 0].pack("S_S_S_S_")
+      #   @out.ioctl(Termios::TIOCGWINSZ, s)
+
+      #   @height, @width, _, _ = s.unpack("S_S_S_S_")
+      # else
+      #   @height, @width = 10, 10
+      # end
+    end
+
     def start
-      s = [0, 0, 0, 0].pack("S_S_S_S_")
-      STDOUT.ioctl(Termios::TIOCGWINSZ, s)
-
-      @height, @WIDTH, _, _ = s.unpack("S_S_S_S_")
-
-      # Raw mode
-      current = Termios.tcgetattr(STDIN)
-      t = current.dup
-      t.c_iflag &= ~(Termios::BRKINT | Termios::ICRNL | Termios::INPCK | Termios::ISTRIP | Termios::IXON)
-      t.c_oflag &= ~(Termios::OPOST)
-      t.c_cflag |= (Termios::CS8)
-      t.c_lflag &= ~(Termios::ECHO | Termios::ICANON | Termios::IEXTEN | Termios::ISIG)
-      t.c_cc[Termios::VMIN] = 1 # Setting 0 as in Kilo raises EOF errors
-      Termios.tcsetattr(STDIN, Termios::TCSANOW, t)
-
-      trap("INT") {
-        Termios.tcsetattr(STDIN, Termios::TCSANOW, current)
-        exit(0)
-      }
+      extract_dimensions
+      enable_raw_mode
 
       @text_content = [""]
       @cursor_position = [1, 1]
 
       loop do
         refresh
-        c = STDIN.readpartial(1)
+        c = @in.readpartial(1)
         if c == "q"
-          Process.kill("INT", Process.pid)
+          exit(0)
         end
         # stderr_log("ord: #{c.ord}")
         if c.ord == 13 # enter
@@ -121,10 +149,10 @@ module Giga
             @cursor_position[0] -= 1
           end
         elsif c.ord == 27 # ESC
-          second_char = STDIN.read_nonblock(1, exception: false)
+          second_char = @in.read_nonblock(1, exception: false)
           next if second_char == :wait_readable
 
-          third_char = STDIN.read_nonblock(1, exception: false)
+          third_char = @in.read_nonblock(1, exception: false)
           next if third_char == :wait_readable
 
           if second_char == "["

@@ -13,4 +13,6 @@ Gem::Specification.new do |s|
     "https://rubygems.org/gems/giga"
   s.license       = "MIT"
   s.add_runtime_dependency "ruby-termios", '~> 1.1.0'
+  s.add_development_dependency 'mocha', '~> 1.11.2'
+  # s.add_development_dependency 'timecop', '~> 0.9.1'
 end

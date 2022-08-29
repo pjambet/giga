@@ -1,6 +1,7 @@
 require 'termios'
 require 'io/console'
 require 'stringio'
+require 'debug'
 
 module Giga
   class Editor
@@ -50,6 +51,7 @@ module Giga
         @out.rewind
         @out.truncate(0)
       end
+      # binding.break
       @out.write(append_buffer)
     end
 
@@ -105,6 +107,7 @@ module Giga
       loop do
         refresh
         c = @in.readpartial(1)
+        # puts "read #{c} from in"
         if c == "q"
           exit(0)
         end
@@ -149,6 +152,7 @@ module Giga
             @cursor_position[0] -= 1
           end
         elsif c.ord == 27 # ESC
+          # binding.break
           second_char = @in.read_nonblock(1, exception: false)
           next if second_char == :wait_readable
 

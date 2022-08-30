@@ -23,14 +23,14 @@ module Giga
       @width, @height = width, height
       @current = nil
       @text_content = nil
-      @cursor_position = nil
+      @x, @y = nil
     end
 
     def start
       enable_raw_mode
 
       @text_content = [""]
-      @cursor_position = [1, 1]
+      @x, @y = 1, 1
 
       loop do
         refresh
@@ -62,11 +62,10 @@ module Giga
       end
       append_buffer.strip!
       append_buffer << "\x1b[H" # Go home
-      x, y = @cursor_position
-      append_buffer << "\x1b[#{y};#{x}H"
+      append_buffer << "\x1b[#{@y};#{@x}H"
       append_buffer << "\x1b[?25h" # Show cursor
       stderr_log("'#{append_buffer}'".inspect)
-      stderr_log("Cursor postition: x: #{@cursor_position[0]}, y: #{@cursor_position[1]}: #{y};#{x}H")
+      stderr_log("Cursor postition: x: #{@x}, y: #{@y}: #{@y};#{@x}H")
 
       if @out.is_a?(StringIO)
         @out.rewind
@@ -76,7 +75,7 @@ module Giga
     end
 
     def current_row
-      @text_content[@cursor_position[1] - 1]
+      @text_content[@y - 1]
     end
 
     def stderr_log(message)
@@ -101,43 +100,43 @@ module Giga
       end
 
       if character.ord == ENTER
-        if current_row && current_row.length > (@cursor_position[0] - 1)
-          carry = current_row[(@cursor_position[0] - 1)..-1]
-          current_row.slice!((@cursor_position[0] - 1)..-1)
+        if current_row && current_row.length > (@x - 1)
+          carry = current_row[(@x - 1)..-1]
+          current_row.slice!((@x - 1)..-1)
         else
           carry = ""
         end
-        if @cursor_position[1] - 1 == @text_content.length # We're on a new line at the end
-          new_line_index = @cursor_position[1] - 1
+        if @y - 1 == @text_content.length # We're on a new line at the end
+          new_line_index = @y - 1
         else
-          new_line_index = @cursor_position[1]
+          new_line_index = @y
         end
         @text_content.insert(new_line_index, carry)
-        @cursor_position[0] = 1
-        @cursor_position[1] += 1
+        @x = 1
+        @y += 1
       elsif character.ord == BACKSPACE
-        return if @cursor_position[0] == 1 && @cursor_position[1] == 1
+        return if @x == 1 && @y == 1
 
-        if @cursor_position[0] == 1
+        if @x == 1
           if current_row.nil?
-            @text_content.delete_at(@cursor_position[1] - 1)
-            @cursor_position[1] -= 1
-            @cursor_position[0] = current_row.length + 1
+            @text_content.delete_at(@y - 1)
+            @y -= 1
+            @x = current_row.length + 1
           elsif current_row.empty?
-            @text_content.delete_at(@cursor_position[1] - 1)
-            @cursor_position[1] -= 1
-            @cursor_position[0] = current_row.length + 1
+            @text_content.delete_at(@y - 1)
+            @y -= 1
+            @x = current_row.length + 1
           else
-            previous_row = @text_content[@cursor_position[1] - 2]
-            @cursor_position[0] = previous_row.length + 1
-            @text_content[@cursor_position[1] - 2] = previous_row + current_row
-            @text_content.delete_at(@cursor_position[1] - 1)
-            @cursor_position[1] -= 1
+            previous_row = @text_content[@y - 2]
+            @x = previous_row.length + 1
+            @text_content[@y - 2] = previous_row + current_row
+            @text_content.delete_at(@y - 1)
+            @y -= 1
           end
         else
-          deletion_index = @cursor_position[0] - 2
+          deletion_index = @x - 2
           current_row.slice!(deletion_index)
-          @cursor_position[0] -= 1
+          @x -= 1
         end
       elsif character.ord == ESC
         second_char = @in.read_nonblock(1, exception: false)
@@ -149,35 +148,35 @@ module Giga
         if second_char == "["
           case third_char
           when UP
-            @cursor_position[1] -= 1 unless @cursor_position[1] == 1
-            if current_row && @cursor_position[0] > current_row.length + 1
-              @cursor_position[0] = current_row.length + 1
+            @y -= 1 unless @y == 1
+            if current_row && @x > current_row.length + 1
+              @x = current_row.length + 1
             end
           when DOWN
-            if @cursor_position[1] == @text_content.length
-              @cursor_position[0] = 1
+            if @y == @text_content.length
+              @x = 1
             end
-            @cursor_position[1] += 1 unless @cursor_position[1] == @text_content.length + 1
-            if current_row && @cursor_position[0] > current_row.length + 1
-              @cursor_position[0] = current_row.length + 1
+            @y += 1 unless @y == @text_content.length + 1
+            if current_row && @x > current_row.length + 1
+              @x = current_row.length + 1
             end
           when RIGHT
-            if current_row && @cursor_position[0] > current_row.length
-              if @cursor_position[1] <= @text_content.length + 1
-                @cursor_position[0] = 1
-                @cursor_position[1] += 1
+            if current_row && @x > current_row.length
+              if @y <= @text_content.length + 1
+                @x = 1
+                @y += 1
               end
             elsif current_row
-              @cursor_position[0] += 1
+              @x += 1
             end
           when LEFT
-            if @cursor_position[0] == 1
-              if @cursor_position[1] > 1
-                @cursor_position[1] -= 1
-                @cursor_position[0] = current_row.length + 1
+            if @x == 1
+              if @y > 1
+                @y -= 1
+                @x = current_row.length + 1
               end
             else
-              @cursor_position[0] -= 1
+              @x -= 1
             end
           when HOME then "H" # Home
           when END_ then "F" # End
@@ -187,8 +186,8 @@ module Giga
         if current_row.nil?
           @text_content << ""
         end
-        current_row.insert(@cursor_position[0] - 1, character)
-        @cursor_position[0] += 1
+        current_row.insert(@x - 1, character)
+        @x += 1
       else
         stderr_log("Ignored char: #{character.ord}")
       end

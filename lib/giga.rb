@@ -5,9 +5,9 @@ require 'debug'
 
 module Giga
   class Editor
-    def initialize(stdin = STDIN, stdout = STDOUT, stderr = STDERR)
+    def initialize(width:, height:, stdin: STDIN, stdout: STDOUT, stderr: STDERR)
       @in, @out, @err = stdin, stdout, stderr
-      @height, @width = nil, nil
+      @width, @height = width, height
       @current = nil
       @text_content = nil
       @cursor_position = nil
@@ -16,19 +16,15 @@ module Giga
     def refresh
       append_buffer = ""
       append_buffer << "\x1b[?25l" # Hide cursor
-      append_buffer << "\x1b[H"
-      # stderr_log @text_content
-      @height.times do |row_index|
+      append_buffer << "\x1b[H" # Go home
 
+      @height.times do |row_index|
         if row_index >= @text_content.count
-          append_buffer << "~\x1b[0K\r\n"
-          # stderr_log("Row index: #{row_index}")
-          # stderr_log("Line count: #{@text_content.count}")
+          append_buffer << "~\x1b[0K\r\n" # ~ and clear line
           next
         end
 
         row = @text_content[row_index] || ""
-        # stderr_log "'#{row}'"
         append_buffer << row
         # https://notes.burke.libbey.me/ansi-escape-codes/
         # https://en.wikipedia.org/wiki/ANSI_escape_code
@@ -37,21 +33,17 @@ module Giga
         append_buffer << "\r\n"
       end
       append_buffer.strip!
-      append_buffer << "\x1b[H"
+      append_buffer << "\x1b[H" # Go home
       x, y = @cursor_position
-      # x += 1 if x > 0
       append_buffer << "\x1b[#{y};#{x}H"
-      # append_buffer << "\x1b[;1H"
       append_buffer << "\x1b[?25h" # Show cursor
       stderr_log("'#{append_buffer}'".inspect)
       stderr_log("Cursor postition: x: #{@cursor_position[0]}, y: #{@cursor_position[1]}: #{y};#{x}H")
 
-      # binding.break
       if @out.is_a?(StringIO)
         @out.rewind
         @out.truncate(0)
       end
-      # binding.break
       @out.write(append_buffer)
     end
 
@@ -60,45 +52,22 @@ module Giga
     end
 
     def stderr_log(message)
-      # binding.break
       unless @err.tty? # true when not redirecting to a file, a little janky but works for what I want
-        # binding.break
         @err.puts(message)
       end
     end
 
     def enable_raw_mode
       IO.console.raw! if @out.tty?
-      # return unless @in.tty?
-
-      # # Raw mode
-      # @current = Termios.tcgetattr(@in)
-      # t = @current.dup
-      # t.c_iflag &= ~(Termios::BRKINT | Termios::ICRNL | Termios::INPCK | Termios::ISTRIP | Termios::IXON)
-      # t.c_oflag &= ~(Termios::OPOST)
-      # t.c_cflag |= (Termios::CS8)
-      # t.c_lflag &= ~(Termios::ECHO | Termios::ICANON | Termios::IEXTEN | Termios::ISIG)
-      # t.c_cc[Termios::VMIN] = 1 # Setting 0 as in Kilo raises EOF errors
-      # Termios.tcsetattr(@in, Termios::TCSANOW, t)
     end
 
     def extract_dimensions
       if @out.tty?
         @height, @width = IO.console.winsize
-      else
-        @height, @width = 10, 10
       end
-      #   s = [0, 0, 0, 0].pack("S_S_S_S_")
-      #   @out.ioctl(Termios::TIOCGWINSZ, s)
-
-      #   @height, @width, _, _ = s.unpack("S_S_S_S_")
-      # else
-      #   @height, @width = 10, 10
-      # end
     end
 
     def start
-      extract_dimensions
       enable_raw_mode
 
       @text_content = [""]
@@ -107,11 +76,10 @@ module Giga
       loop do
         refresh
         c = @in.readpartial(1)
-        # puts "read #{c} from in"
         if c == "q"
           exit(0)
         end
-        # stderr_log("ord: #{c.ord}")
+
         if c.ord == 13 # enter
           if current_row && current_row.length > (@cursor_position[0] - 1)
             carry = current_row[(@cursor_position[0] - 1)..-1]
@@ -152,7 +120,6 @@ module Giga
             @cursor_position[0] -= 1
           end
         elsif c.ord == 27 # ESC
-          # binding.break
           second_char = @in.read_nonblock(1, exception: false)
           next if second_char == :wait_readable
 
@@ -175,7 +142,6 @@ module Giga
                 @cursor_position[0] = current_row.length + 1
               end
             when "C" # Right
-              # stderr_log("Current row: #{current_row}\n")
               if current_row && @cursor_position[0] > current_row.length
                 if @cursor_position[1] <= @text_content.length + 1
                   @cursor_position[0] = 1
@@ -197,7 +163,6 @@ module Giga
             when "F" then "F" # End
             end
           end
-          # @text_content.last << third_char
         elsif c.ord >= 32 && c.ord <= 126
           if current_row.nil?
             @text_content << ""

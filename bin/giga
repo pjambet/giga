@@ -1,5 +1,7 @@
 #!/usr/bin/env ruby
 
 require 'giga'
+require 'io/console'
 
-Giga::Editor.new.start
+height, width = IO.console.winsize
+Giga::Editor.new(width: width, height: height).start

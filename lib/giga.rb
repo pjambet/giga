@@ -5,6 +5,19 @@ require 'debug'
 
 module Giga
   class Editor
+
+    ESC = 27
+    CTRL = ""
+    ENTER = 13
+    BACKSPACE = 127
+    PRINTABLE_ASCII_RANGE = 32..126
+    UP = "A"
+    DOWN = "B"
+    RIGHT = "C"
+    LEFT = "D"
+    HOME = "H"
+    END_ = "F"
+
     def initialize(width:, height:, stdin: STDIN, stdout: STDOUT, stderr: STDERR)
       @in, @out, @err = stdin, stdout, stderr
       @width, @height = width, height
@@ -80,7 +93,7 @@ module Giga
           exit(0)
         end
 
-        if c.ord == 13 # enter
+        if c.ord == ENTER
           if current_row && current_row.length > (@cursor_position[0] - 1)
             carry = current_row[(@cursor_position[0] - 1)..-1]
             current_row.slice!((@cursor_position[0] - 1)..-1)
@@ -95,7 +108,7 @@ module Giga
           @text_content.insert(new_line_index, carry)
           @cursor_position[0] = 1
           @cursor_position[1] += 1
-        elsif c.ord == 127 # backspace
+        elsif c.ord == BACKSPACE
           next if @cursor_position[0] == 1 && @cursor_position[1] == 1
 
           if @cursor_position[0] == 1
@@ -119,7 +132,7 @@ module Giga
             current_row.slice!(deletion_index)
             @cursor_position[0] -= 1
           end
-        elsif c.ord == 27 # ESC
+        elsif c.ord == ESC
           second_char = @in.read_nonblock(1, exception: false)
           next if second_char == :wait_readable
 
@@ -128,12 +141,12 @@ module Giga
 
           if second_char == "["
             case third_char
-            when "A" # Up
+            when UP
               @cursor_position[1] -= 1 unless @cursor_position[1] == 1
               if current_row && @cursor_position[0] > current_row.length + 1
                 @cursor_position[0] = current_row.length + 1
               end
-            when "B" # Down
+            when DOWN
               if @cursor_position[1] == @text_content.length
                 @cursor_position[0] = 1
               end
@@ -141,7 +154,7 @@ module Giga
               if current_row && @cursor_position[0] > current_row.length + 1
                 @cursor_position[0] = current_row.length + 1
               end
-            when "C" # Right
+            when RIGHT
               if current_row && @cursor_position[0] > current_row.length
                 if @cursor_position[1] <= @text_content.length + 1
                   @cursor_position[0] = 1
@@ -150,7 +163,7 @@ module Giga
               elsif current_row
                 @cursor_position[0] += 1
               end
-            when "D" # Left
+            when LEFT
               if @cursor_position[0] == 1
                 if @cursor_position[1] > 1
                   @cursor_position[1] -= 1
@@ -159,11 +172,11 @@ module Giga
               else
                 @cursor_position[0] -= 1
               end
-            when "H" then "H" # Home
-            when "F" then "F" # End
+            when HOME then "H" # Home
+            when END_ then "F" # End
             end
           end
-        elsif c.ord >= 32 && c.ord <= 126
+        elsif PRINTABLE_ASCII_RANGE.cover?(c.ord)
           if current_row.nil?
             @text_content << ""
           end

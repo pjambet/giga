@@ -26,6 +26,21 @@ module Giga
       @cursor_position = nil
     end
 
+    def start
+      enable_raw_mode
+
+      @text_content = [""]
+      @cursor_position = [1, 1]
+
+      loop do
+        refresh
+        char = @in.readpartial(1)
+        process_keypress(char)
+      end
+    end
+
+    private
+
     def refresh
       append_buffer = ""
       append_buffer << "\x1b[?25l" # Hide cursor
@@ -80,111 +95,102 @@ module Giga
       end
     end
 
-    def start
-      enable_raw_mode
+    def process_keypress(character)
+      if character == "q"
+        exit(0)
+      end
 
-      @text_content = [""]
-      @cursor_position = [1, 1]
-
-      loop do
-        refresh
-        c = @in.readpartial(1)
-        if c == "q"
-          exit(0)
-        end
-
-        if c.ord == ENTER
-          if current_row && current_row.length > (@cursor_position[0] - 1)
-            carry = current_row[(@cursor_position[0] - 1)..-1]
-            current_row.slice!((@cursor_position[0] - 1)..-1)
-          else
-            carry = ""
-          end
-          if @cursor_position[1] - 1 == @text_content.length # We're on a new line at the end
-            new_line_index = @cursor_position[1] - 1
-          else
-            new_line_index = @cursor_position[1]
-          end
-          @text_content.insert(new_line_index, carry)
-          @cursor_position[0] = 1
-          @cursor_position[1] += 1
-        elsif c.ord == BACKSPACE
-          next if @cursor_position[0] == 1 && @cursor_position[1] == 1
-
-          if @cursor_position[0] == 1
-            if current_row.nil?
-              @text_content.delete_at(@cursor_position[1] - 1)
-              @cursor_position[1] -= 1
-              @cursor_position[0] = current_row.length + 1
-            elsif current_row.empty?
-              @text_content.delete_at(@cursor_position[1] - 1)
-              @cursor_position[1] -= 1
-              @cursor_position[0] = current_row.length + 1
-            else
-              previous_row = @text_content[@cursor_position[1] - 2]
-              @cursor_position[0] = previous_row.length + 1
-              @text_content[@cursor_position[1] - 2] = previous_row + current_row
-              @text_content.delete_at(@cursor_position[1] - 1)
-              @cursor_position[1] -= 1
-            end
-          else
-            deletion_index = @cursor_position[0] - 2
-            current_row.slice!(deletion_index)
-            @cursor_position[0] -= 1
-          end
-        elsif c.ord == ESC
-          second_char = @in.read_nonblock(1, exception: false)
-          next if second_char == :wait_readable
-
-          third_char = @in.read_nonblock(1, exception: false)
-          next if third_char == :wait_readable
-
-          if second_char == "["
-            case third_char
-            when UP
-              @cursor_position[1] -= 1 unless @cursor_position[1] == 1
-              if current_row && @cursor_position[0] > current_row.length + 1
-                @cursor_position[0] = current_row.length + 1
-              end
-            when DOWN
-              if @cursor_position[1] == @text_content.length
-                @cursor_position[0] = 1
-              end
-              @cursor_position[1] += 1 unless @cursor_position[1] == @text_content.length + 1
-              if current_row && @cursor_position[0] > current_row.length + 1
-                @cursor_position[0] = current_row.length + 1
-              end
-            when RIGHT
-              if current_row && @cursor_position[0] > current_row.length
-                if @cursor_position[1] <= @text_content.length + 1
-                  @cursor_position[0] = 1
-                  @cursor_position[1] += 1
-                end
-              elsif current_row
-                @cursor_position[0] += 1
-              end
-            when LEFT
-              if @cursor_position[0] == 1
-                if @cursor_position[1] > 1
-                  @cursor_position[1] -= 1
-                  @cursor_position[0] = current_row.length + 1
-                end
-              else
-                @cursor_position[0] -= 1
-              end
-            when HOME then "H" # Home
-            when END_ then "F" # End
-            end
-          end
-        elsif PRINTABLE_ASCII_RANGE.cover?(c.ord)
-          if current_row.nil?
-            @text_content << ""
-          end
-          current_row.insert(@cursor_position[0] - 1, c)
-          @cursor_position[0] += 1
+      if character.ord == ENTER
+        if current_row && current_row.length > (@cursor_position[0] - 1)
+          carry = current_row[(@cursor_position[0] - 1)..-1]
+          current_row.slice!((@cursor_position[0] - 1)..-1)
         else
-          stderr_log("Ignored char: #{c.ord}")
+          carry = ""
         end
+        if @cursor_position[1] - 1 == @text_content.length # We're on a new line at the end
+          new_line_index = @cursor_position[1] - 1
+        else
+          new_line_index = @cursor_position[1]
+        end
+        @text_content.insert(new_line_index, carry)
+        @cursor_position[0] = 1
+        @cursor_position[1] += 1
+      elsif character.ord == BACKSPACE
+        return if @cursor_position[0] == 1 && @cursor_position[1] == 1
+
+        if @cursor_position[0] == 1
+          if current_row.nil?
+            @text_content.delete_at(@cursor_position[1] - 1)
+            @cursor_position[1] -= 1
+            @cursor_position[0] = current_row.length + 1
+          elsif current_row.empty?
+            @text_content.delete_at(@cursor_position[1] - 1)
+            @cursor_position[1] -= 1
+            @cursor_position[0] = current_row.length + 1
+          else
+            previous_row = @text_content[@cursor_position[1] - 2]
+            @cursor_position[0] = previous_row.length + 1
+            @text_content[@cursor_position[1] - 2] = previous_row + current_row
+            @text_content.delete_at(@cursor_position[1] - 1)
+            @cursor_position[1] -= 1
+          end
+        else
+          deletion_index = @cursor_position[0] - 2
+          current_row.slice!(deletion_index)
+          @cursor_position[0] -= 1
+        end
+      elsif character.ord == ESC
+        second_char = @in.read_nonblock(1, exception: false)
+        return if second_char == :wait_readable
+
+        third_char = @in.read_nonblock(1, exception: false)
+        return if third_char == :wait_readable
+
+        if second_char == "["
+          case third_char
+          when UP
+            @cursor_position[1] -= 1 unless @cursor_position[1] == 1
+            if current_row && @cursor_position[0] > current_row.length + 1
+              @cursor_position[0] = current_row.length + 1
+            end
+          when DOWN
+            if @cursor_position[1] == @text_content.length
+              @cursor_position[0] = 1
+            end
+            @cursor_position[1] += 1 unless @cursor_position[1] == @text_content.length + 1
+            if current_row && @cursor_position[0] > current_row.length + 1
+              @cursor_position[0] = current_row.length + 1
+            end
+          when RIGHT
+            if current_row && @cursor_position[0] > current_row.length
+              if @cursor_position[1] <= @text_content.length + 1
+                @cursor_position[0] = 1
+                @cursor_position[1] += 1
+              end
+            elsif current_row
+              @cursor_position[0] += 1
+            end
+          when LEFT
+            if @cursor_position[0] == 1
+              if @cursor_position[1] > 1
+                @cursor_position[1] -= 1
+                @cursor_position[0] = current_row.length + 1
+              end
+            else
+              @cursor_position[0] -= 1
+            end
+          when HOME then "H" # Home
+          when END_ then "F" # End
+          end
+        end
+      elsif PRINTABLE_ASCII_RANGE.cover?(character.ord)
+        if current_row.nil?
+          @text_content << ""
+        end
+        current_row.insert(@cursor_position[0] - 1, character)
+        @cursor_position[0] += 1
+      else
+        stderr_log("Ignored char: #{character.ord}")
       end
     end
   end

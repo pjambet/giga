@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-require 'termios'
 require 'io/console'
-require 'stringio'
 require 'debug'
 
 module Giga
@@ -54,7 +52,7 @@ module Giga
           next
         end
 
-        row = @text_content[row_index] || ""
+        row = @text_content[row_index] || String.new
         append_buffer << row
         # https://notes.burke.libbey.me/ansi-escape-codes/
         # https://en.wikipedia.org/wiki/ANSI_escape_code
@@ -69,10 +67,6 @@ module Giga
       stderr_log("'#{append_buffer}'".inspect)
       stderr_log("Cursor postition: x: #{@x}, y: #{@y}: #{@y};#{@x}H")
 
-      if @out.is_a?(StringIO)
-        @out.rewind
-        @out.truncate(0)
-      end
       @out.write(append_buffer)
     end
 
@@ -106,7 +100,7 @@ module Giga
           carry = current_row[(@x - 1)..-1]
           current_row.slice!((@x - 1)..-1)
         else
-          carry = ""
+          carry = String.new
         end
         if @y - 1 == @text_content.length # We're on a new line at the end
           new_line_index = @y - 1
@@ -186,7 +180,7 @@ module Giga
         end
       elsif PRINTABLE_ASCII_RANGE.cover?(character.ord)
         if current_row.nil?
-          @text_content << ""
+          @text_content << String.new
         end
         current_row.insert(@x - 1, character)
         @x += 1

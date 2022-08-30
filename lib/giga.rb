@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'termios'
 require 'io/console'
 require 'stringio'
@@ -29,7 +31,7 @@ module Giga
     def start
       enable_raw_mode
 
-      @text_content = [""]
+      @text_content = [String.new]
       @x, @y = 1, 1
 
       loop do
@@ -42,7 +44,7 @@ module Giga
     private
 
     def refresh
-      append_buffer = ""
+      append_buffer = String.new
       append_buffer << "\x1b[?25l" # Hide cursor
       append_buffer << "\x1b[H" # Go home
 

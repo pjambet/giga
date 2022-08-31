@@ -34,15 +34,15 @@ module Giga
     end
 
     def start
-      enable_raw_mode
-
       @text_content = [String.new]
       @x, @y = 1, 1
 
-      loop do
-        refresh
-        char = @in.readpartial(1)
-        process_keypress(char)
+      raw_mode do
+        loop do
+          refresh
+          char = @in.readpartial(1)
+          process_keypress(char)
+        end
       end
     end
 
@@ -87,8 +87,12 @@ module Giga
       end
     end
 
-    def enable_raw_mode
-      IO.console.raw! if @out.tty?
+    def raw_mode(&block)
+      if @out.tty?
+        IO.console.raw(&block)
+      else
+        block.call
+      end
     end
 
     def extract_dimensions
@@ -99,6 +103,7 @@ module Giga
 
     def process_keypress(character)
       if character.ord == CTRL_Q
+        clear_screen!
         exit(0)
       elsif character.ord == ENTER
         if current_row && current_row.length > (@x - 1)
@@ -211,6 +216,14 @@ module Giga
 
     def end_of_line!
       @x = current_row.length + 1
+    end
+
+    def clear_screen!
+      clear = ([VT100::HOME] + @height.times.map do
+        VT100::CLEAR + "\r\n"
+      end + [VT100::HOME]).join
+      stderr_log(clear.inspect)
+      @out.write(clear)
     end
   end
 end

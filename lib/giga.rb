@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'giga/vt_100'
 require 'io/console'
 require 'debug'
 
@@ -43,12 +44,12 @@ module Giga
 
     def refresh
       append_buffer = String.new
-      append_buffer << "\x1b[?25l" # Hide cursor
-      append_buffer << "\x1b[H" # Go home
+      append_buffer << VT100::HIDE
+      append_buffer << VT100::HOME
 
       @height.times do |row_index|
         if row_index >= @text_content.count
-          append_buffer << "~\x1b[0K\r\n" # ~ and clear line
+          append_buffer << "~" + VT100::CLEAR + "\r\n"
           next
         end
 
@@ -56,14 +57,14 @@ module Giga
         append_buffer << row
         # https://notes.burke.libbey.me/ansi-escape-codes/
         # https://en.wikipedia.org/wiki/ANSI_escape_code
-        append_buffer << "\x1b[39m" # Default foregroung color
-        append_buffer << "\x1b[0K" # Erase the rest of the line
+        append_buffer << VT100::DEFAULT_FOREGROUND_COLOR
+        append_buffer << VT100::CLEAR
         append_buffer << "\r\n"
       end
       append_buffer.strip!
-      append_buffer << "\x1b[H" # Go home
-      append_buffer << "\x1b[#{@y};#{@x}H"
-      append_buffer << "\x1b[?25h" # Show cursor
+      append_buffer << VT100::HOME
+      append_buffer << VT100Helpers.coordinates(@x, @y)
+      append_buffer << VT100::SHOW
       stderr_log("'#{append_buffer}'".inspect)
       stderr_log("Cursor postition: x: #{@x}, y: #{@y}: #{@y};#{@x}H")
 

@@ -9,6 +9,12 @@ module Giga
 
     ESC = 27
     CTRL = ""
+    CTRL_Q = 2
+    CTRL_S = 19
+    CTRL_A = 1
+    CTRL_E = 5
+    CTRL_N = 14
+    CTRL_P = 16
     ENTER = 13
     BACKSPACE = 127
     PRINTABLE_ASCII_RANGE = 32..126
@@ -92,11 +98,9 @@ module Giga
     end
 
     def process_keypress(character)
-      if character == "q"
+      if character.ord == CTRL_Q
         exit(0)
-      end
-
-      if character.ord == ENTER
+      elsif character.ord == ENTER
         if current_row && current_row.length > (@x - 1)
           carry = current_row.slice!((@x - 1)..-1)
         else
@@ -130,6 +134,14 @@ module Giga
           current_row.slice!(deletion_index)
           @x -= 1
         end
+      elsif character.ord == CTRL_N
+        down!
+      elsif character.ord == CTRL_P
+        up!
+      elsif character.ord == CTRL_A
+        beginning_of_line!
+      elsif character.ord == CTRL_E
+        end_of_line!
       elsif character.ord == ESC
         second_char = @in.read_nonblock(1, exception: false)
         return if second_char == :wait_readable
@@ -140,18 +152,9 @@ module Giga
         if second_char == "["
           case third_char
           when UP
-            @y -= 1 unless @y == 1
-            if current_row && @x > current_row.length + 1
-              @x = current_row.length + 1
-            end
+            up!
           when DOWN
-            if @y == @text_content.length
-              @x = 1
-            end
-            @y += 1 unless @y == @text_content.length + 1
-            if current_row && @x > current_row.length + 1
-              @x = current_row.length + 1
-            end
+            down!
           when RIGHT
             if current_row && @x > current_row.length
               if @y <= @text_content.length + 1
@@ -183,6 +186,31 @@ module Giga
       else
         stderr_log("Ignored char: #{character.ord}")
       end
+    end
+
+    def up!
+      @y -= 1 unless @y == 1
+      if current_row && @x > current_row.length + 1
+        @x = current_row.length + 1
+      end
+    end
+
+    def down!
+      if @y == @text_content.length
+        @x = 1
+      end
+      @y += 1 unless @y == @text_content.length + 1
+      if current_row && @x > current_row.length + 1
+        @x = current_row.length + 1
+      end
+    end
+
+    def beginning_of_line!
+      @x = 1
+    end
+
+    def end_of_line!
+      @x = current_row.length + 1
     end
   end
 end

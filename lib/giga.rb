@@ -98,8 +98,7 @@ module Giga
 
       if character.ord == ENTER
         if current_row && current_row.length > (@x - 1)
-          carry = current_row[(@x - 1)..-1]
-          current_row.slice!((@x - 1)..-1)
+          carry = current_row.slice!((@x - 1)..-1)
         else
           carry = String.new
         end
@@ -115,11 +114,7 @@ module Giga
         return if @x == 1 && @y == 1
 
         if @x == 1
-          if current_row.nil?
-            @text_content.delete_at(@y - 1)
-            @y -= 1
-            @x = current_row.length + 1
-          elsif current_row.empty?
+          if current_row.nil? || current_row.empty?
             @text_content.delete_at(@y - 1)
             @y -= 1
             @x = current_row.length + 1

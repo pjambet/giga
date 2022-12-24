@@ -1,0 +1,31 @@
+inherit_from: ~/.config/rubocop/config.yml
+
+Style/Documentation:
+    Enabled: false
+
+# Metrics/ClassLength:
+    # Enabled: false
+
+Metrics/AbcSize:
+    Enabled: false
+
+Metrics/MethodLength:
+    Enabled: false
+
+Metrics/CyclomaticComplexity:
+    Enabled: false
+
+Metrics/PerceivedComplexity:
+    Enabled: false
+
+Metrics/BlockLength:
+    Enabled: false
+
+Metrics/BlockNesting:
+    Enabled: false
+
+Style/GlobalStdStream:
+    Enabled: false
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes

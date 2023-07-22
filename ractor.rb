@@ -1,23 +1,25 @@
+# frozen_string_literal: true
+
 # r, w = IO.pipe
 
 server = Ractor.new do
-  puts "server starts: #{self.inspect}"
+  puts "server starts: #{ inspect }"
   Ractor.yield "foo"
   received = Ractor.receive
-  puts "received #{received}"
+  puts "received #{ received }"
 end
 
 client = Ractor.new(server) do |srv|
-  puts "client starts: #{self.inspect}"
+  puts "client starts: #{ inspect }"
   b = srv.take
-  puts "Received #{b}"
+  puts "Received #{ b }"
   srv.send "Gotcha"
 end
 
 # server.send 1
 # client.send 2
 
-puts "finalize: #{client.take}"
+puts "finalize: #{ client.take }"
 server.take
 
 # server = Ractor.new do

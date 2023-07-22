@@ -8,7 +8,7 @@ module Giga
   class Editor
     ESC = 27
     CTRL = ""
-    CTRL_Q = 2
+    CTRL_Q = 17
     CTRL_S = 19
     CTRL_A = 1
     CTRL_E = 5

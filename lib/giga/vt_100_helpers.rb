@@ -2,8 +2,8 @@
 
 module Giga
   module VT100Helpers
-    def self.foreground_color(_color)
-      "\x1b[39m"
+    def self.foreground_color(color)
+      "\x1b[#{ color }m"
     end
 
     def self.coordinates(x, y)

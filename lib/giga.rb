@@ -1,12 +1,11 @@
 # frozen_string_literal: true
 
-require 'giga/vt_100'
-require 'io/console'
-require 'debug'
+require "giga/vt_100"
+require "io/console"
+require "debug"
 
 module Giga
   class Editor
-
     ESC = 27
     CTRL = ""
     CTRL_Q = 2
@@ -26,8 +25,11 @@ module Giga
     END_ = "F"
 
     def initialize(width:, height:, stdin: STDIN, stdout: STDOUT, stderr: STDERR)
-      @in, @out, @err = stdin, stdout, stderr
-      @width, @height = width, height
+      @in = stdin
+      @out = stdout
+      @err = stderr
+      @width = width
+      @height = height
       @current = nil
       @text_content = nil
       @x, @y = nil
@@ -35,7 +37,8 @@ module Giga
 
     def start
       @text_content = [String.new]
-      @x, @y = 1, 1
+      @x = 1
+      @y = 1
 
       raw_mode do
         loop do
@@ -55,7 +58,7 @@ module Giga
 
       @height.times do |row_index|
         if row_index >= @text_content.count
-          append_buffer << "~" + VT100::CLEAR + "\r\n"
+          append_buffer << "~#{ VT100::CLEAR }\r\n"
           next
         end
 
@@ -71,8 +74,8 @@ module Giga
       append_buffer << VT100::HOME
       append_buffer << VT100Helpers.coordinates(@x, @y)
       append_buffer << VT100::SHOW
-      stderr_log("'#{append_buffer}'".inspect)
-      stderr_log("Cursor postition: x: #{@x}, y: #{@y}: #{@y};#{@x}H")
+      stderr_log("'#{ append_buffer }'".inspect)
+      stderr_log("Cursor postition: x: #{ @x }, y: #{ @y }: #{ @y };#{ @x }H")
 
       @out.write(append_buffer)
     end
@@ -82,9 +85,9 @@ module Giga
     end
 
     def stderr_log(message)
-      unless @err.tty? # true when not redirecting to a file, a little janky but works for what I want
-        @err.puts(message)
-      end
+      return if @err.tty? # true when not redirecting to a file, a little janky but works for what I want
+
+      @err.puts(message)
     end
 
     def raw_mode(&block)
@@ -96,9 +99,9 @@ module Giga
     end
 
     def extract_dimensions
-      if @out.tty?
-        @height, @width = IO.console.winsize
-      end
+      return unless @out.tty?
+
+      @height, @width = IO.console.winsize
     end
 
     def process_keypress(character)
@@ -106,16 +109,16 @@ module Giga
         clear_screen!
         exit(0)
       elsif character.ord == ENTER
-        if current_row && current_row.length > (@x - 1)
-          carry = current_row.slice!((@x - 1)..-1)
-        else
-          carry = String.new
-        end
-        if @y - 1 == @text_content.length # We're on a new line at the end
-          new_line_index = @y - 1
-        else
-          new_line_index = @y
-        end
+        carry = if current_row && current_row.length > (@x - 1)
+                  current_row.slice!((@x - 1)..-1)
+                else
+                  String.new
+                end
+        new_line_index = if @y - 1 == @text_content.length # We're on a new line at the end
+                           @y - 1
+                         else
+                           @y
+                         end
         @text_content.insert(new_line_index, carry)
         @x = 1
         @y += 1
@@ -183,31 +186,27 @@ module Giga
           end
         end
       elsif PRINTABLE_ASCII_RANGE.cover?(character.ord)
-        if current_row.nil?
-          @text_content << String.new
-        end
+        @text_content << String.new if current_row.nil?
         current_row.insert(@x - 1, character)
         @x += 1
       else
-        stderr_log("Ignored char: #{character.ord}")
+        stderr_log("Ignored char: #{ character.ord }")
       end
     end
 
     def up!
       @y -= 1 unless @y == 1
-      if current_row && @x > current_row.length + 1
-        @x = current_row.length + 1
-      end
+      return unless current_row && @x > current_row.length + 1
+
+      @x = current_row.length + 1
     end
 
     def down!
-      if @y == @text_content.length
-        @x = 1
-      end
+      @x = 1 if @y == @text_content.length
       @y += 1 unless @y == @text_content.length + 1
-      if current_row && @x > current_row.length + 1
-        @x = current_row.length + 1
-      end
+      return unless current_row && @x > current_row.length + 1
+
+      @x = current_row.length + 1
     end
 
     def beginning_of_line!
@@ -220,7 +219,7 @@ module Giga
 
     def clear_screen!
       clear = ([VT100::HOME] + @height.times.map do
-        VT100::CLEAR + "\r\n"
+        "#{ VT100::CLEAR }\r\n"
       end + [VT100::HOME]).join
       stderr_log(clear.inspect)
       @out.write(clear)

@@ -1,4 +1,8 @@
-inherit_from: ~/.config/rubocop/config.yml
+inherit_from:
+  - ~/.config/rubocop/config.yml
+
+AllCops:
+  TargetRubyVersion: 3.2
 
 Style/Documentation:
     Enabled: false
@@ -29,3 +33,6 @@ Style/GlobalStdStream:
 
 Style/StringLiterals:
   EnforcedStyle: double_quotes
+
+Naming/MethodParameterName:
+  Enabled: false

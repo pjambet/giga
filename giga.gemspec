@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "lib/giga/version"
 
 Gem::Specification.new do |s|
@@ -8,11 +10,12 @@ Gem::Specification.new do |s|
   s.description = "A console text editor, built pretty much from scratch"
   s.authors     = ["Pierre Jambet"]
   s.email       = "hello@pjam.me"
-  s.files       = Dir.glob('{bin,lib}/**/*') + %w(LICENSE README.md)
+  s.files       = Dir.glob("{bin,lib}/**/*") + %w[LICENSE README.md]
   s.homepage    =
     "https://rubygems.org/gems/giga"
-  s.license       = "MIT"
-  s.add_runtime_dependency "ruby-termios", '~> 1.1.0'
-  s.add_development_dependency 'mocha', '~> 1.11.2'
-  # s.add_development_dependency 'timecop', '~> 0.9.1'
+  s.license     = "MIT"
+  s.required_ruby_version = ">= 3.2.0"
+  s.add_runtime_dependency "ruby-termios", "~> 1.1.0"
+  s.add_development_dependency "mocha", "~> 1.11.2"
+  # s.add_development_dependency "timecop", "~> 0.9.1"
 end

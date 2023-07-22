@@ -1,7 +1,9 @@
 #!/usr/bin/env ruby
 
-require 'giga'
-require 'io/console'
+# frozen_string_literal: true
+
+require "giga"
+require "io/console"
 
 height, width = IO.console.winsize
-Giga::Editor.new(width: width, height: height).start
+Giga::Editor.new(width:, height:).start

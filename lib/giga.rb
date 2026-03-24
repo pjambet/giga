@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+# puts $LOAD_PATH
+# require "vt_100"
 require "giga/vt_100"
 require "io/console"
 require "debug"
@@ -10,6 +12,10 @@ module Giga
     CTRL = ""
     CTRL_Q = 17
     CTRL_S = 19
+    CTRL_D = 4
+    CTRL_F = 6
+    CTRL_B = 2
+    CTRL_H = 8
     CTRL_A = 1
     CTRL_E = 5
     CTRL_N = 14
@@ -122,26 +128,10 @@ module Giga
         @text_content.insert(new_line_index, carry)
         @x = 1
         @y += 1
-      elsif character.ord == BACKSPACE
-        return if @x == 1 && @y == 1
-
-        if @x == 1
-          if current_row.nil? || current_row.empty?
-            @text_content.delete_at(@y - 1)
-            @y -= 1
-            @x = current_row.length + 1
-          else
-            previous_row = @text_content[@y - 2]
-            @x = previous_row.length + 1
-            @text_content[@y - 2] = previous_row + current_row
-            @text_content.delete_at(@y - 1)
-            @y -= 1
-          end
-        else
-          deletion_index = @x - 2
-          current_row.slice!(deletion_index)
-          @x -= 1
-        end
+      elsif character.ord == BACKSPACE || character.ord == CTRL_H
+        backspace!
+      elsif character.ord == CTRL_D
+        delete_char!
       elsif character.ord == CTRL_N
         down!
       elsif character.ord == CTRL_P
@@ -150,39 +140,33 @@ module Giga
         beginning_of_line!
       elsif character.ord == CTRL_E
         end_of_line!
+      elsif character.ord == CTRL_F
+        right!
+      elsif character.ord == CTRL_B
+        left!
       elsif character.ord == ESC
-        second_char = @in.read_nonblock(1, exception: false)
-        return if second_char == :wait_readable
+        # Use a short timeout to detect if this is an escape sequence or just ESC
+        # We use read_nonblock with a rescue to avoid blocking indefinitely if it's just ESC
+        begin
+          second_char = @in.read_nonblock(3) # Read the rest of the sequence
+        rescue IO::WaitReadable
+          return # It was just the ESC key
+        end
 
-        third_char = @in.read_nonblock(1, exception: false)
-        return if third_char == :wait_readable
-
-        if second_char == "["
-          case third_char
+        if second_char.start_with?("[")
+          case second_char[1]
           when UP
             up!
           when DOWN
             down!
           when RIGHT
-            if current_row && @x > current_row.length
-              if @y <= @text_content.length + 1
-                @x = 1
-                @y += 1
-              end
-            elsif current_row
-              @x += 1
-            end
+            right!
           when LEFT
-            if @x == 1
-              if @y > 1
-                @y -= 1
-                @x = current_row.length + 1
-              end
-            else
-              @x -= 1
-            end
-          when HOME then "H" # Home
-          when END_ then "F" # End
+            left!
+          when HOME then beginning_of_line!
+          when END_ then end_of_line!
+          when "3"
+            delete_char! if second_char[2] == "~"
           end
         end
       elsif PRINTABLE_ASCII_RANGE.cover?(character.ord)
@@ -191,6 +175,40 @@ module Giga
         @x += 1
       else
         stderr_log("Ignored char: #{ character.ord }")
+      end
+    end
+
+    def delete_char!
+      row = current_row
+      return if row.nil?
+
+      if @x <= row.length
+        row.slice!(@x - 1)
+      elsif @y < @text_content.length
+        next_row = @text_content.delete_at(@y)
+        row << next_row
+      end
+    end
+
+    def backspace!
+      return if @x == 1 && @y == 1
+
+      if @x == 1
+        if current_row.nil? || current_row.empty?
+          @text_content.delete_at(@y - 1)
+          @y -= 1
+          @x = current_row.length + 1
+        else
+          previous_row = @text_content[@y - 2]
+          @x = previous_row.length + 1
+          @text_content[@y - 2] = previous_row + current_row
+          @text_content.delete_at(@y - 1)
+          @y -= 1
+        end
+      else
+        deletion_index = @x - 2
+        current_row.slice!(deletion_index)
+        @x -= 1
       end
     end
 
@@ -207,6 +225,28 @@ module Giga
       return unless current_row && @x > current_row.length + 1
 
       @x = current_row.length + 1
+    end
+
+    def left!
+      if @x == 1
+        if @y > 1
+          @y -= 1
+          @x = current_row.length + 1
+        end
+      else
+        @x -= 1
+      end
+    end
+
+    def right!
+      if current_row && @x > current_row.length
+        if @y <= @text_content.length + 1
+          @x = 1
+          @y += 1
+        end
+      elsif current_row
+        @x += 1
+      end
     end
 
     def beginning_of_line!

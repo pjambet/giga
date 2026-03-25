@@ -148,7 +148,8 @@ module Giga
         # Use a short timeout to detect if this is an escape sequence or just ESC
         # We use read_nonblock with a rescue to avoid blocking indefinitely if it's just ESC
         begin
-          second_char = @in.read_nonblock(3) # Read the rest of the sequence
+          # Read a chunk. Mouse sequences can be long (e.g., \e[<0;10;20M)
+          second_char = @in.read_nonblock(10)
         rescue IO::WaitReadable
           return # It was just the ESC key
         end
@@ -167,6 +168,10 @@ module Giga
           when END_ then end_of_line!
           when "3"
             delete_char! if second_char[2] == "~"
+          when "M", "<"
+            # This is a mouse sequence (X10 or SGR). 
+            # We just ignore it to prevent weird characters from being typed.
+            stderr_log("Ignored mouse event: #{ second_char.inspect }")
           end
         end
       elsif PRINTABLE_ASCII_RANGE.cover?(character.ord)

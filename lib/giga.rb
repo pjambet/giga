@@ -87,7 +87,7 @@ module Giga
     end
 
     def current_row
-      @text_content[@y - 1]
+      @text_content[@y - 1] || ""
     end
 
     def stderr_log(message)
@@ -148,14 +148,19 @@ module Giga
         # Use a short timeout to detect if this is an escape sequence or just ESC
         # We use read_nonblock with a rescue to avoid blocking indefinitely if it's just ESC
         begin
-          # Read a chunk. Mouse sequences can be long (e.g., \e[<0;10;20M)
-          second_char = @in.read_nonblock(10)
+          second_char = @in.read_nonblock(1) 
         rescue IO::WaitReadable
           return # It was just the ESC key
         end
 
-        if second_char.start_with?("[")
-          case second_char[1]
+        if second_char == "["
+          begin
+            third_char = @in.read_nonblock(1)
+          rescue IO::WaitReadable
+            return
+          end
+
+          case third_char
           when UP
             up!
           when DOWN
@@ -167,16 +172,28 @@ module Giga
           when HOME then beginning_of_line!
           when END_ then end_of_line!
           when "3"
-            delete_char! if second_char[2] == "~"
+            # Consume the '~' for the delete sequence
+            begin
+              fourth_char = @in.read_nonblock(1)
+              delete_char! if fourth_char == "~"
+            rescue IO::WaitReadable
+            end
           when "M", "<"
-            # This is a mouse sequence (X10 or SGR). 
-            # We just ignore it to prevent weird characters from being typed.
-            stderr_log("Ignored mouse event: #{ second_char.inspect }")
+            # Mouse sequence. These can be long, so we try to consume until the end ('M' or 'm')
+            # or just a few more bytes for X10. 
+            # For now, just consume a reasonable amount to clear the buffer.
+            begin
+              @in.read_nonblock(10)
+            rescue IO::WaitReadable
+            end
+            stderr_log("Ignored mouse event")
           end
         end
       elsif PRINTABLE_ASCII_RANGE.cover?(character.ord)
-        @text_content << String.new if current_row.nil?
-        current_row.insert(@x - 1, character)
+        if (@y - 1) >= @text_content.length
+          @text_content << String.new
+        end
+        @text_content[@y - 1].insert(@x - 1, character)
         @x += 1
       else
         stderr_log("Ignored char: #{ character.ord }")
@@ -244,12 +261,13 @@ module Giga
     end
 
     def right!
-      if current_row && @x > current_row.length
-        if @y <= @text_content.length + 1
+      row_count = @text_content.length
+      if @y <= row_count && @x > @text_content[@y - 1].length
+        if @y <= row_count
           @x = 1
           @y += 1
         end
-      elsif current_row
+      elsif @y <= row_count
         @x += 1
       end
     end

@@ -6,5 +6,6 @@ gemspec
 
 gem "debug"
 gem "minitest", "~> 5.0"
+gem "mocha"
 gem "rake", "~> 12.0"
 gem "rubocop"

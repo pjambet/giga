@@ -20,10 +20,10 @@ describe Giga do
       read_in.close
       write_in.write("a")
       write_in.write("b")
-      write_in.write("\x1B[D") # Mimick left arrow, \x1B is Esc/27
-      write_in.write("\x1B[C") # Mimick right arrow, \x1B is Esc/27
-      write_in.write("\x1B[C") # Mimick right arrow, \x1B is Esc/27
-      write_in.write("\x1B[C") # Mimick right arrow, \x1B is Esc/27
+      write_in.write("\x1B[D") # Mimick left arrow: Esc [ D
+      write_in.write("\x1B[C") # Mimick right arrow: Esc [ C
+      write_in.write("\x1B[C") # Mimick right arrow: Esc [ C
+      write_in.write("\x1B[C") # Mimick right arrow: Esc [ C
       write_in.close
       Process.wait
 
@@ -49,6 +49,38 @@ describe Giga do
         read_in.close
         write_out.close
         exit(0)
+      end
+    end
+  end
+
+  it "doesn't crash when calling end_of_line! on a new line at the end of buffer" do
+    read_in, write_in = IO.pipe
+    read_out, write_out = IO.pipe
+    stderr = StringIO.new
+
+    if fork
+      # parent
+      write_out.close
+      read_in.close
+      write_in.write("\x0E") # CTRL_N (Down) - should move to line 2 (virtual)
+      write_in.write("\x05") # CTRL_E (End of line) - trigger crash
+      write_in.close
+      _, status = Process.wait2
+      assert_equal 0, status.exitstatus, "Editor crashed with status #{status.exitstatus}"
+    else
+      # child
+      write_in.close
+      read_out.close
+      begin
+        # Initialize with 1 line, navigate to line 2
+        editor = Giga::Editor.new(width: @width, height: @height, stdin: read_in, stdout: write_out, stderr:)
+        editor.start
+      rescue EOFError
+        exit(0)
+      rescue => e
+        # Log error so we can see it in failure
+        File.open("test_crash.log", "w") { |f| f.write("#{e.class}: #{e.message}\n#{e.backtrace.join("\n")}") }
+        exit(1)
       end
     end
   end
